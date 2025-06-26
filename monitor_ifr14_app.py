@@ -17,8 +17,8 @@ def calcular_ifr(df, periodo=14):
     return 100 - (100 / (1 + rs))
 
 def candle_reversao(df):
-    corpo = abs(df['Close'] - df['Open'])
-    sombra_inferior = df[['Open', 'Close']].min(axis=1) - df['Low']
+    corpo = abs(df['Close'].astype(float) - df['Open'].astype(float))
+    sombra_inferior = df[['Open', 'Close']].min(axis=1).astype(float) - df['Low'].astype(float)
     return (sombra_inferior > corpo) & (corpo > 0)
 
 # ----------------------------

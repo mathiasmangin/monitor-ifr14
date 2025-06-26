@@ -19,17 +19,14 @@ def calcular_ifr(df, periodo=14):
     return 100 - (100 / (1 + rs))
 
 def candle_reversao(df):
-    corpo = abs(df['Close'].astype(float) - df['Open'].astype(float))
-
+    corpo = abs(df['Close'].astype(float) - df['Open'].astype(float)).to_numpy()
     min_open_close = df[['Open', 'Close']].min(axis=1)
     if isinstance(min_open_close, pd.DataFrame):
         min_open_close = min_open_close.iloc[:, 0]
     else:
         min_open_close = min_open_close.squeeze()
-
-    sombra_inferior = min_open_close.astype(float).reset_index(drop=True) - df['Low'].astype(float).reset_index(drop=True)
-    corpo = corpo.reset_index(drop=True)
-
+    sombra_inferior = (min_open_close.astype(float) - df['Low'].astype(float)).to_numpy()
+    
     return (sombra_inferior > corpo) & (corpo > 0)
 
 def enviar_email(mensagem):

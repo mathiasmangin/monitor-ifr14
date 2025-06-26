@@ -23,6 +23,8 @@ def candle_reversao(df):
 
     min_open_close = df[['Open', 'Close']].min(axis=1)
     if isinstance(min_open_close, pd.DataFrame):
+        min_open_close = min_open_close.iloc[:, 0]
+    else:
         min_open_close = min_open_close.squeeze()
 
     sombra_inferior = min_open_close.astype(float).reset_index(drop=True) - df['Low'].astype(float).reset_index(drop=True)
@@ -132,4 +134,3 @@ if st.button("🔍 Atualizar Alertas"):
             st.pyplot(fig)
 
 st.caption("Desenvolvido com 💻 por ChatGPT + Streamlit")
-

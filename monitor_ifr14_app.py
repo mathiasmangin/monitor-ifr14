@@ -1,8 +1,10 @@
-
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import matplotlib.pyplot as plt
 from datetime import datetime
+import smtplib
+from email.mime.text import MIMEText
 
 # ----------------------------
 # Funções de cálculo
@@ -18,23 +20,51 @@ def calcular_ifr(df, periodo=14):
 
 def candle_reversao(df):
     corpo = abs(df['Close'].astype(float) - df['Open'].astype(float))
-    sombra_inferior = df[['Open', 'Close']].min(axis=1).astype(float) - df['Low'].astype(float)
+
+    min_open_close = df[['Open', 'Close']].min(axis=1)
+    if isinstance(min_open_close, pd.DataFrame):
+        min_open_close = min_open_close.squeeze()
+
+    sombra_inferior = min_open_close.astype(float).reset_index(drop=True) - df['Low'].astype(float).reset_index(drop=True)
+    corpo = corpo.reset_index(drop=True)
+
     return (sombra_inferior > corpo) & (corpo > 0)
+
+def enviar_email(mensagem):
+    # Configure com seus dados reais
+    remetente = "SEU_EMAIL@gmail.com"
+    senha = "SUA_SENHA_DE_APP"
+    destinatario = "DESTINATARIO@gmail.com"
+    try:
+        msg = MIMEText(mensagem, 'plain', 'utf-8')
+        msg['Subject'] = f'Alerta IFR 14 - {datetime.today().date()}'
+        msg['From'] = remetente
+        msg['To'] = destinatario
+
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+            smtp.login(remetente, senha)
+            smtp.send_message(msg)
+        return True
+    except Exception as e:
+        return False
 
 # ----------------------------
 # Streamlit App
 # ----------------------------
 st.set_page_config(page_title="Alerta IFR 14", layout="wide")
-st.title("📈 Monitor de Ações - Alerta por IFR 14 (Brasil)")
+st.title("📈 Monitor de Ações - IFR 14 + Gráfico + E-mail")
 
 acoes = st.multiselect("Selecione as ações da B3 para monitorar:", 
                        ['PETR4.SA', 'VALE3.SA', 'ITUB4.SA', 'WEGE3.SA', 'BBDC4.SA'],
                        default=['PETR4.SA', 'VALE3.SA'])
 
+mostrar_grafico = st.checkbox("📉 Mostrar gráfico de Preço + IFR", value=True)
+
 if st.button("🔍 Atualizar Alertas"):
 
     alertas = []
     tabela_resultados = []
+    graficos = {}
 
     for acao in acoes:
         df = yf.download(acao, period="3mo", interval="1d")
@@ -67,6 +97,9 @@ if st.button("🔍 Atualizar Alertas"):
             'Alerta?': '✅' if cond_ifr and cond_mme and cond_volume and cond_candle else ''
         })
 
+        if mostrar_grafico:
+            graficos[acao] = df[['Close', 'RSI_14']].dropna().tail(30)
+
     st.subheader("📊 Resultados:")
     df_resultados = pd.DataFrame(tabela_resultados)
     st.dataframe(df_resultados, use_container_width=True)
@@ -75,7 +108,28 @@ if st.button("🔍 Atualizar Alertas"):
         st.success("✅ Alertas de possível compra encontrados:")
         for alerta in alertas:
             st.write(alerta)
+
+        if st.button("📧 Enviar alertas por e-mail"):
+            corpo = "\\n".join(alertas)
+            enviado = enviar_email(corpo)
+            if enviado:
+                st.success("E-mail enviado com sucesso!")
+            else:
+                st.error("Erro ao enviar o e-mail. Verifique configurações.")
     else:
         st.warning("Nenhum alerta detectado com os critérios atuais.")
 
+    if mostrar_grafico and graficos:
+        st.subheader("📉 Gráficos de Preço e IFR 14 (últimos 30 dias)")
+        for acao, dados in graficos.items():
+            st.write(f"**{acao}**")
+            fig, ax1 = plt.subplots()
+            ax2 = ax1.twinx()
+            ax1.plot(dados.index, dados['Close'], color='blue', label='Preço')
+            ax2.plot(dados.index, dados['RSI_14'], color='green', label='IFR 14')
+            ax1.set_ylabel('Preço', color='blue')
+            ax2.set_ylabel('IFR 14', color='green')
+            st.pyplot(fig)
+
 st.caption("Desenvolvido com 💻 por ChatGPT + Streamlit")
+
